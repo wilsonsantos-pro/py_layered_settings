@@ -8,8 +8,7 @@ import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from multilayer_settings.orm import (Base, Layer, MultilayerSetting,
-                                     SettingGroup)
+from multilayer_settings.orm import Base, Layer, MultilayerSetting
 
 if TYPE_CHECKING:
     from sqlalchemy import Engine
@@ -92,13 +91,9 @@ class TestMultilayerSetting:
         dbsession.flush()
 
     @classmethod
-    def _create_groups(cls, dbsession: "Session"):
-        # In this case we create one group per account, so effectively group == account
-        cls.account_1 = SettingGroup(name="Account 1")
-        dbsession.add(cls.account_1)
-        cls.account_2 = SettingGroup(name="Account 2")
-        dbsession.add(cls.account_2)
-        dbsession.flush()
+    def _create_accounts(cls):
+        cls.account_1_id = 1
+        cls.account_2_id = 2
 
     @classmethod
     def _create_settings(cls, dbsession: "Session"):
@@ -112,7 +107,7 @@ class TestMultilayerSetting:
             value="on",
             layer_id=cls.layer_account.id,
             entity_id=1,
-            group_id=cls.account_1.id,
+            parent_id=cls.account_1_id,
         )
         dbsession.add(cls.account_1_setting)
 
@@ -121,7 +116,7 @@ class TestMultilayerSetting:
             value="off",
             layer_id=cls.layer_account.id,
             entity_id=2,
-            group_id=cls.account_2.id,
+            parent_id=cls.account_2_id,
         )
         dbsession.add(cls.account_2_setting)
 
@@ -130,7 +125,7 @@ class TestMultilayerSetting:
             value="50",
             layer_id=cls.layer_account.id,
             entity_id=4,
-            group_id=4,
+            parent_id=4,
         )
         dbsession.add(cls.account_4_setting)
 
@@ -140,7 +135,7 @@ class TestMultilayerSetting:
     @pytest.fixture(scope="class", autouse=True)
     def setup_class(cls, dbsession):
         cls._create_layers(dbsession)
-        cls._create_groups(dbsession)
+        cls._create_accounts()
         cls._create_settings(dbsession)
         yield
 
@@ -170,22 +165,22 @@ class TestMultilayerSetting:
         """The setting requested for user is not set, not even a default.
         Expected: None"""
         result = MultilayerSetting.get_setting(
-            dbsession, "whoami", Layers.USER, entity_id=1, group_id=1
+            dbsession, "whoami", Layers.USER, entity_id=1, parent_id=1
         )
         assert not result
 
     def test_account_setting(self, dbsession: "Session"):
-        """Two accounts (groups), each account has its own setting set.
+        """Two accounts, each account has its own setting set.
         Expected: get system for the corresponding account."""
         result = MultilayerSetting.get_setting(
-            dbsession, "lights", Layers.ACCOUNT, group_id=1
+            dbsession, "lights", Layers.ACCOUNT, parent_id=1
         )
         assert result
         assert result.value == "on"
         assert result.id == self.account_1_setting.id
 
         result = MultilayerSetting.get_setting(
-            dbsession, "lights", Layers.ACCOUNT, group_id=2
+            dbsession, "lights", Layers.ACCOUNT, parent_id=2
         )
         assert result
         assert result.value == "off"
@@ -195,7 +190,7 @@ class TestMultilayerSetting:
         """An account doesn't have the value set for the setting.
         Expected: get system setting."""
         result = MultilayerSetting.get_setting(
-            dbsession, "lights", Layers.ACCOUNT, entity_id=3, group_id=3  # account 3
+            dbsession, "lights", Layers.ACCOUNT, entity_id=3, parent_id=3  # account 3
         )
         assert result
         assert result.value == "on"
@@ -209,14 +204,14 @@ class TestMultilayerSetting:
             "exclusive4",
             Layers.ACCOUNT,
             entity_id=4,
-            group_id=4,
+            parent_id=4,
         )
         assert result
         assert result.value == "50"
         assert result.id == self.account_4_setting.id
 
     def test_user_with_account_setting(self, dbsession: "Session"):
-        """User belongs to account (group) #2. The account has value set, user not.
+        """User belongs to account #2. The account has value set, user not.
         Expected: get the user setting from the account value.
         """
         result = MultilayerSetting.get_setting(
@@ -224,7 +219,7 @@ class TestMultilayerSetting:
             "lights",
             Layers.USER,
             entity_id=1,
-            group_id=self.account_2.id,
+            parent_id=self.account_2_id,
         )
         assert result
         assert result.value == "off"
@@ -235,7 +230,7 @@ class TestMultilayerSetting:
         Expected: get system setting.
         """
         result = MultilayerSetting.get_setting(
-            dbsession, "lights", Layers.USER, entity_id=2, group_id=3  # account #3
+            dbsession, "lights", Layers.USER, entity_id=2, parent_id=3  # account #3
         )
         assert result
         assert result.value == "on"
