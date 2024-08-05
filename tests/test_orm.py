@@ -177,14 +177,14 @@ class TestMultilayerSetting:
         """Two accounts (groups), each account has its own setting set.
         Expected: get system for the corresponding account."""
         result = MultilayerSetting.get_setting(
-            dbsession, "lights", Layers.ACCOUNT, entity_id=1, group_id=1
+            dbsession, "lights", Layers.ACCOUNT, group_id=1
         )
         assert result
         assert result.value == "on"
         assert result.id == self.account_1_setting.id
 
         result = MultilayerSetting.get_setting(
-            dbsession, "lights", Layers.ACCOUNT, entity_id=2, group_id=2
+            dbsession, "lights", Layers.ACCOUNT, group_id=2
         )
         assert result
         assert result.value == "off"

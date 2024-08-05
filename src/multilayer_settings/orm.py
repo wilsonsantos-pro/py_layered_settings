@@ -42,7 +42,7 @@ class MultilayerSetting(Base):
         dbsession: "Session",
         name: str,
         layer_id: int,
-        entity_id: int,
+        entity_id: Optional[int] = None,
         group_id: Optional[int] = None,
     ) -> Optional["MultilayerSetting"]:
         return MultilayerSetting._get_setting(
@@ -57,9 +57,7 @@ class MultilayerSetting(Base):
         layer_stmt = select(Layer).where(Layer.fallback_id.is_(None))
         layer = dbsession.scalars(layer_stmt).first()
         if layer:
-            return MultilayerSetting._get_setting(
-                dbsession, name, layer.id, use_default=False
-            )
+            return MultilayerSetting._get_setting(dbsession, name, layer.id)
         return None
 
     @staticmethod
@@ -69,7 +67,6 @@ class MultilayerSetting(Base):
         layer_id: int,
         entity_id: Optional[int] = None,
         group_id: Optional[int] = None,
-        use_default: bool = True,
     ) -> Optional["MultilayerSetting"]:
         where_clause = [
             MultilayerSetting.name == name,
@@ -84,7 +81,7 @@ class MultilayerSetting(Base):
         stmt = select(MultilayerSetting).where(*where_clause)
         result = dbsession.scalars(stmt).first()
 
-        if not result and use_default:
+        if not result and (entity_id or group_id):
             layer_stmt = select(Layer).where(Layer.id == layer_id)
             layer = dbsession.scalars(layer_stmt).first()
 
@@ -95,7 +92,9 @@ class MultilayerSetting(Base):
                     )
                 # it's the last/default layer
                 return MultilayerSetting._get_setting(
-                    dbsession, name, layer_id, group_id=None, use_default=False
+                    dbsession,
+                    name,
+                    layer.id,
                 )
             return None
 
