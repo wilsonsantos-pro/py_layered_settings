@@ -136,6 +136,7 @@ class TestMultilayerSetting:
 
         dbsession.flush()
 
+    @classmethod
     @pytest.fixture(scope="class", autouse=True)
     def setup_class(cls, dbsession):
         cls._create_layers(dbsession)
