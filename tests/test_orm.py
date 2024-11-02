@@ -2,8 +2,8 @@
 import contextlib
 from dataclasses import dataclass
 from enum import Enum
-from functools import lru_cache
-from typing import TYPE_CHECKING, Callable, Generator, Optional
+from functools import lru_cache, partial
+from typing import TYPE_CHECKING, Any, Callable, Generator, Optional, Type
 
 import pytest
 from sqlalchemy import create_engine
@@ -78,11 +78,43 @@ class Layers(int, Enum):
     GROUP = 4
 
 
+class Settings(str, Enum):
+    lights = "lights"
+
+
 @dataclass
 class User:
     id: int
     account_id: int
     group_id: Optional[int] = None
+
+
+@dataclass
+class UserSettingsRepository:
+    dbsession: "Session"
+    user: User
+
+    @property
+    def lights(self):
+        return self.get(Settings.lights)
+
+    def get(self, name: Settings) -> Any:
+        return MultilayerSetting.get_setting(
+            self.dbsession,
+            name,
+            Layers.USER,
+            entity_id=self.user.id,
+            parent_ids=[self.user.group_id, self.user.account_id],
+        )
+
+
+@dataclass
+class SettingsRepository:
+    dbsession: "Session"
+
+    @property
+    def users(self) -> partial[UserSettingsRepository]:
+        return partial(UserSettingsRepository, self.dbsession)
 
 
 @dataclass
@@ -138,14 +170,14 @@ class TestMultilayerSetting:
     def _create_settings(cls, dbsession: "Session"):
 
         cls.system_setting = MultilayerSetting(
-            name="lights",
+            name=Settings.lights,
             value="0",
             layer_id=cls.layer_system.id,
         )
         dbsession.add(cls.system_setting)
 
         cls.account_1_setting = MultilayerSetting(
-            name="lights",
+            name=Settings.lights,
             value="10",
             layer_id=cls.layer_account.id,
             entity_id=cls.account_1_id,
@@ -153,7 +185,7 @@ class TestMultilayerSetting:
         dbsession.add(cls.account_1_setting)
 
         cls.account_2_setting = MultilayerSetting(
-            name="lights",
+            name=Settings.lights,
             value="a20",
             layer_id=cls.layer_account.id,
             entity_id=cls.account_2_id,
@@ -171,7 +203,7 @@ class TestMultilayerSetting:
         dbsession.add(cls.account_4_setting)
 
         cls.user_1_setting = MultilayerSetting(
-            name="lights",
+            name=Settings.lights,
             value="70",
             layer_id=cls.layer_user.id,
             entity_id=cls.user_1.id,
@@ -180,7 +212,7 @@ class TestMultilayerSetting:
         dbsession.add(cls.user_1_setting)
 
         cls.group_2_setting = MultilayerSetting(
-            name="lights",
+            name=Settings.lights,
             value="g20",
             layer_id=cls.layer_group.id,
             entity_id=cls.group_2.id,
@@ -189,7 +221,7 @@ class TestMultilayerSetting:
         dbsession.add(cls.group_2_setting)
 
         cls.group_4_setting = MultilayerSetting(
-            name="lights",
+            name=Settings.lights,
             value="g40",
             layer_id=cls.layer_group.id,
             entity_id=cls.group_4.id,
@@ -350,4 +382,27 @@ class TestMultilayerSetting:
         )
         assert result
         assert result.value == self.user_1_setting.value
+        assert result.id == self.user_1_setting.id
+
+    def test_user_setting_repo(self, dbsession: "Session"):
+        """User has the setting explicitly set.
+        Expected: get user setting."""
+        repo = UserSettingsRepository(dbsession, self.user_1)
+        result = repo.lights
+        assert result
+        assert result.value == self.user_1_setting.value
+        assert result.id == self.user_1_setting.id
+
+    def test_user_setting_generic_repo(self, dbsession: "Session"):
+        """User has the setting explicitly set.
+        Expected: get user setting."""
+        repo = SettingsRepository(dbsession)
+        result = repo.users(self.user_1).lights
+        assert result
+        assert result.value == self.user_1_setting.value
+        assert result.id == self.user_1_setting.id
+
+        # OR
+
+        result = repo.users(self.user_1).get(Settings.lights)
         assert result.id == self.user_1_setting.id
