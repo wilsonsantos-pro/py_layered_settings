@@ -1,5 +1,6 @@
 # pylint: disable=redefined-outer-name
 import contextlib
+from dataclasses import dataclass
 from enum import Enum
 from functools import lru_cache
 from typing import TYPE_CHECKING, Callable, Generator
@@ -65,7 +66,7 @@ def dbsession_ctx(
         yield session
         if auto_commit:
             session.commit()
-    except:
+    except:  # pylint: disable=bare-except
         session.rollback()
 
 
@@ -73,6 +74,12 @@ class Layers(int, Enum):
     SYSTEM = 1
     ACCOUNT = 2
     USER = 3
+
+
+@dataclass
+class User:
+    id: int
+    account_id: int
 
 
 class TestMultilayerSetting:
@@ -94,40 +101,59 @@ class TestMultilayerSetting:
     def _create_accounts(cls):
         cls.account_1_id = 1
         cls.account_2_id = 2
+        cls.account_3_id = 3
+        cls.account_4_id = 4
+
+    @classmethod
+    def _create_users(cls):
+        cls.user_1 = User(id=1, account_id=cls.account_1_id)
+        cls.user_2 = User(id=2, account_id=cls.account_2_id)
+        cls.user_3 = User(id=3, account_id=cls.account_3_id)
 
     @classmethod
     def _create_settings(cls, dbsession: "Session"):
+
         cls.system_setting = MultilayerSetting(
-            name="lights", value="on", layer_id=cls.layer_system.id
+            name="lights",
+            value="0",
+            layer_id=cls.layer_system.id,
         )
         dbsession.add(cls.system_setting)
 
         cls.account_1_setting = MultilayerSetting(
             name="lights",
-            value="on",
+            value="10",
             layer_id=cls.layer_account.id,
             entity_id=1,
-            parent_id=cls.account_1_id,
         )
         dbsession.add(cls.account_1_setting)
 
         cls.account_2_setting = MultilayerSetting(
             name="lights",
-            value="off",
+            value="20",
             layer_id=cls.layer_account.id,
             entity_id=2,
-            parent_id=cls.account_2_id,
         )
         dbsession.add(cls.account_2_setting)
+
+        # no setting for account 3
 
         cls.account_4_setting = MultilayerSetting(
             name="exclusive4",
             value="50",
             layer_id=cls.layer_account.id,
-            entity_id=4,
-            parent_id=4,
+            entity_id=cls.account_4_id,
         )
         dbsession.add(cls.account_4_setting)
+
+        cls.user_1_setting = MultilayerSetting(
+            name="lights",
+            value="70",
+            layer_id=cls.layer_user.id,
+            entity_id=cls.user_1.id,
+            parent_id=cls.user_1.account_id,
+        )
+        dbsession.add(cls.user_1_setting)
 
         dbsession.flush()
 
@@ -136,15 +162,18 @@ class TestMultilayerSetting:
     def setup_class(cls, dbsession):
         cls._create_layers(dbsession)
         cls._create_accounts()
+        cls._create_users()
         cls._create_settings(dbsession)
         yield
 
     def test_setting_default(self, dbsession: "Session"):
         """Get the setting's default.
         Expected: get system setting."""
-        result = MultilayerSetting.get_setting_default(dbsession, "lights")
+        result = MultilayerSetting.get_setting_default(
+            dbsession, self.system_setting.name
+        )
         assert result
-        assert result.value == "on"
+        assert result.value == self.system_setting.value
         assert result.id == self.system_setting.id
 
     def test_setting_default_does_not_exist(self, dbsession: "Session"):
@@ -157,7 +186,7 @@ class TestMultilayerSetting:
         """The setting requested for account is not set, not even a default.
         Expected: None"""
         result = MultilayerSetting.get_setting(
-            dbsession, "whoami", Layers.ACCOUNT, entity_id=1
+            dbsession, "whoami", Layers.ACCOUNT, entity_id=self.account_1_id
         )
         assert not result
 
@@ -165,49 +194,61 @@ class TestMultilayerSetting:
         """The setting requested for user is not set, not even a default.
         Expected: None"""
         result = MultilayerSetting.get_setting(
-            dbsession, "whoami", Layers.USER, entity_id=1, parent_id=1
+            dbsession,
+            "whoami",
+            Layers.USER,
+            entity_id=self.user_1.id,
+            parent_id=self.user_1.account_id,
         )
         assert not result
 
     def test_account_setting(self, dbsession: "Session"):
         """Two accounts, each account has its own setting set.
-        Expected: get system for the corresponding account."""
+        Expected: get value for the corresponding account."""
         result = MultilayerSetting.get_setting(
-            dbsession, "lights", Layers.ACCOUNT, parent_id=1
+            dbsession,
+            self.account_1_setting.name,
+            Layers.ACCOUNT,
+            entity_id=self.account_1_id,
         )
         assert result
-        assert result.value == "on"
+        assert result.value == self.account_1_setting.value
         assert result.id == self.account_1_setting.id
 
         result = MultilayerSetting.get_setting(
-            dbsession, "lights", Layers.ACCOUNT, parent_id=2
+            dbsession,
+            self.account_2_setting.name,
+            Layers.ACCOUNT,
+            entity_id=self.account_2_id,
         )
         assert result
-        assert result.value == "off"
+        assert result.value == self.account_2_setting.value
         assert result.id == self.account_2_setting.id
 
     def test_account_without_value(self, dbsession: "Session"):
         """An account doesn't have the value set for the setting.
         Expected: get system setting."""
         result = MultilayerSetting.get_setting(
-            dbsession, "lights", Layers.ACCOUNT, entity_id=3, parent_id=3  # account 3
+            dbsession,
+            self.system_setting.name,
+            Layers.ACCOUNT,
+            entity_id=self.account_3_id,
         )
         assert result
-        assert result.value == "on"
+        assert result.value == self.system_setting.value
         assert result.id == self.system_setting.id
 
-    def test_account_default_does_not_exist(self, dbsession: "Session"):
+    def test_account_value_and_default_does_not_exist(self, dbsession: "Session"):
         """The setting is only set on this account, default does not exist.
         Expected: get account setting."""
         result = MultilayerSetting.get_setting(
             dbsession,
-            "exclusive4",
+            self.account_4_setting.name,
             Layers.ACCOUNT,
-            entity_id=4,
-            parent_id=4,
+            entity_id=self.account_4_id,
         )
         assert result
-        assert result.value == "50"
+        assert result.value == self.account_4_setting.value
         assert result.id == self.account_4_setting.id
 
     def test_user_with_account_setting(self, dbsession: "Session"):
@@ -216,13 +257,13 @@ class TestMultilayerSetting:
         """
         result = MultilayerSetting.get_setting(
             dbsession,
-            "lights",
+            self.account_2_setting.name,
             Layers.USER,
-            entity_id=1,
-            parent_id=self.account_2_id,
+            entity_id=self.user_2.id,
+            parent_id=self.user_2.account_id,
         )
         assert result
-        assert result.value == "off"
+        assert result.value == self.account_2_setting.value
         assert result.id == self.account_2_setting.id
 
     def test_user_and_account_without_setting(self, dbsession: "Session"):
@@ -230,8 +271,26 @@ class TestMultilayerSetting:
         Expected: get system setting.
         """
         result = MultilayerSetting.get_setting(
-            dbsession, "lights", Layers.USER, entity_id=2, parent_id=3  # account #3
+            dbsession,
+            self.system_setting.name,
+            Layers.USER,
+            entity_id=self.user_3.id,
+            parent_id=self.user_3.account_id,
         )
         assert result
-        assert result.value == "on"
+        assert result.value == self.system_setting.value
         assert result.id == self.system_setting.id
+
+    def test_user_setting(self, dbsession: "Session"):
+        """User has the setting explicitly set.
+        Expected: get user setting."""
+        result = MultilayerSetting.get_setting(
+            dbsession,
+            self.user_1_setting.name,
+            Layers.USER,
+            entity_id=self.user_1.id,
+            parent_id=self.user_1.account_id,
+        )
+        assert result
+        assert result.value == self.user_1_setting.value
+        assert result.id == self.user_1_setting.id
