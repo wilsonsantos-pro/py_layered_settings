@@ -211,8 +211,8 @@ class TestMultilayerSetting:
     def test_setting_default(self, dbsession: "Session"):
         """Get the setting's default.
         Expected: get system setting."""
-        result = MultilayerSetting.get_setting_default(
-            dbsession, self.system_setting.name
+        result = MultilayerSetting.get_setting(
+            dbsession, self.system_setting.name, Layers.SYSTEM
         )
         assert result
         assert result.value == self.system_setting.value
@@ -221,7 +221,7 @@ class TestMultilayerSetting:
     def test_setting_default_does_not_exist(self, dbsession: "Session"):
         """The setting requested is not set, not even a default.
         Expected: None"""
-        result = MultilayerSetting.get_setting_default(dbsession, "whoami")
+        result = MultilayerSetting.get_setting(dbsession, "whoami", Layers.SYSTEM)
         assert not result
 
     def test_account_setting_does_not_exist(self, dbsession: "Session"):

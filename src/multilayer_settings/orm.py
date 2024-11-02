@@ -14,8 +14,10 @@ class Base(DeclarativeBase):
 class Layer(Base):
     __tablename__ = "settings__layer"
     id: Mapped[int] = mapped_column(primary_key=True)
-    name: Mapped[str] = mapped_column(String(50))
-    fallback_id: Mapped[Optional[int]] = mapped_column(ForeignKey("settings__layer.id"))
+    name: Mapped[str] = mapped_column(String(50), nullable=False)
+    fallback_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("settings__layer.id"), nullable=True
+    )
 
     # TODO(business rule) only one layer with fallback_id == None can exist
     # that's the default layer
@@ -25,15 +27,17 @@ class MultilayerSetting(Base):
     __tablename__ = "settings__multilayer_setting"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    name: Mapped[str] = mapped_column(String(50))
-    value: Mapped[str] = mapped_column(String(200))
-    layer_id: Mapped[int] = mapped_column(ForeignKey("settings__layer.id"))
+    name: Mapped[str] = mapped_column(String(50), nullable=False)
+    value: Mapped[str] = mapped_column(String(200), nullable=False)
+    layer_id: Mapped[int] = mapped_column(
+        ForeignKey("settings__layer.id"), nullable=False
+    )
     # entity_id is null to allow a "default" setting
     # TODO(business rule) don't allow setting creation for entity_id == None, unless
     # it's the default layer
-    entity_id: Mapped[Optional[int]] = mapped_column(Integer)
+    entity_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     # parent is the entity in the "upper" layer
-    parent_id: Mapped[Optional[int]] = mapped_column(Integer)
+    parent_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
 
     def __repr__(self) -> str:
         return (
@@ -44,29 +48,6 @@ class MultilayerSetting(Base):
 
     @staticmethod
     def get_setting(
-        dbsession: "Session",
-        name: str,
-        layer_id: int,
-        entity_id: Optional[int] = None,
-        parent_ids: Optional[List[Optional[int]]] = None,
-    ) -> Optional["MultilayerSetting"]:
-        return MultilayerSetting._get_setting(
-            dbsession, name, layer_id, entity_id, parent_ids
-        )
-
-    @staticmethod
-    def get_setting_default(
-        dbsession: "Session",
-        name: str,
-    ) -> Optional["MultilayerSetting"]:
-        layer_stmt = select(Layer).where(Layer.fallback_id.is_(None))
-        layer = dbsession.scalars(layer_stmt).first()
-        if layer:
-            return MultilayerSetting._get_setting(dbsession, name, layer.id)
-        return None
-
-    @staticmethod
-    def _get_setting(
         dbsession: "Session",
         name: str,
         layer_id: int,
@@ -95,7 +76,7 @@ class MultilayerSetting(Base):
                     parent_id = parent_ids[0]
                     parent_ids = parent_ids[1:]
 
-                    return MultilayerSetting._get_setting(
+                    return MultilayerSetting.get_setting(
                         dbsession,
                         name,
                         layer.fallback_id,
@@ -107,7 +88,7 @@ class MultilayerSetting(Base):
             layer_stmt = select(Layer).where(Layer.fallback_id.is_(None))
             default_layer = dbsession.scalars(layer_stmt).first()
             if default_layer:
-                return MultilayerSetting._get_setting(
+                return MultilayerSetting.get_setting(
                     dbsession,
                     name,
                     default_layer.id,
