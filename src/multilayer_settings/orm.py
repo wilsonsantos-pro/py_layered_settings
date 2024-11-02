@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, List, Optional
 
 from sqlalchemy import ForeignKey, Integer, String, select
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
@@ -48,10 +48,10 @@ class MultilayerSetting(Base):
         name: str,
         layer_id: int,
         entity_id: Optional[int] = None,
-        parent_id: Optional[int] = None,
+        parent_ids: Optional[List[Optional[int]]] = None,
     ) -> Optional["MultilayerSetting"]:
         return MultilayerSetting._get_setting(
-            dbsession, name, layer_id, entity_id, parent_id
+            dbsession, name, layer_id, entity_id, parent_ids
         )
 
     @staticmethod
@@ -71,7 +71,7 @@ class MultilayerSetting(Base):
         name: str,
         layer_id: int,
         entity_id: Optional[int] = None,
-        parent_id: Optional[int] = None,
+        parent_ids: Optional[List[Optional[int]]] = None,
     ) -> Optional["MultilayerSetting"]:
         where_clause = [
             MultilayerSetting.name == name,
@@ -85,21 +85,22 @@ class MultilayerSetting(Base):
         stmt = select(MultilayerSetting).where(*where_clause)
         result = dbsession.scalars(stmt).first()
 
-        # "and entity_id or parent_id" guarantees that we stop when it's the last layer
-        if not result and (entity_id or parent_id):
-            if parent_id:
+        # "and entity_id or parent_ids" guarantees that we stop when it's the last layer
+        if not result and (entity_id or parent_ids):
+            if parent_ids:
                 layer_stmt = select(Layer).where(Layer.id == layer_id)
                 layer = dbsession.scalars(layer_stmt).first()
 
                 if layer and layer.fallback_id:
+                    parent_id = parent_ids[0]
+                    parent_ids = parent_ids[1:]
+
                     return MultilayerSetting._get_setting(
                         dbsession,
                         name,
                         layer.fallback_id,
                         entity_id=parent_id,
-                        # parent_id might be the id of parent of the parent, etc
-                        # so we pass it again to search for it on the upper layers
-                        parent_id=parent_id,
+                        parent_ids=parent_ids,
                     )
 
             # it's the last/default layer

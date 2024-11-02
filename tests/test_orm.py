@@ -10,6 +10,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from multilayer_settings.orm import Base, Layer, MultilayerSetting
+from tests.random_data import random_int
 
 if TYPE_CHECKING:
     from sqlalchemy import Engine
@@ -117,19 +118,21 @@ class TestMultilayerSetting:
 
     @classmethod
     def _create_accounts(cls):
-        cls.account_1_id = 1
-        cls.account_2_id = 2
-        cls.account_3_id = 3
-        cls.account_4_id = 4
+        cls.account_1_id = random_int()
+        cls.account_2_id = random_int()
+        cls.account_3_id = random_int()
+        cls.account_4_id = random_int()
 
     @classmethod
     def _create_users(cls):
-        cls.group_2 = Group(id=2, account_id=cls.account_2_id)
-        cls.group_4 = Group(id=4, account_id=cls.account_4_id)
-        cls.user_1 = User(id=1, account_id=cls.account_1_id)
-        cls.user_2 = User(id=2, account_id=cls.account_2_id, group_id=cls.group_2.id)
-        cls.user_3 = User(id=3, account_id=cls.account_3_id)
-        cls.user_4 = User(id=4, account_id=cls.account_4_id)
+        cls.group_2 = Group(id=random_int(), account_id=cls.account_2_id)
+        cls.group_4 = Group(id=random_int(), account_id=cls.account_4_id)
+        cls.user_1 = User(id=random_int(), account_id=cls.account_1_id)
+        cls.user_2 = User(
+            id=random_int(), account_id=cls.account_2_id, group_id=cls.group_2.id
+        )
+        cls.user_3 = User(id=random_int(), account_id=cls.account_3_id)
+        cls.user_4 = User(id=random_int(), account_id=cls.account_4_id)
 
     @classmethod
     def _create_settings(cls, dbsession: "Session"):
@@ -145,7 +148,7 @@ class TestMultilayerSetting:
             name="lights",
             value="10",
             layer_id=cls.layer_account.id,
-            entity_id=1,
+            entity_id=cls.account_1_id,
         )
         dbsession.add(cls.account_1_setting)
 
@@ -153,7 +156,7 @@ class TestMultilayerSetting:
             name="lights",
             value="a20",
             layer_id=cls.layer_account.id,
-            entity_id=2,
+            entity_id=cls.account_2_id,
         )
         dbsession.add(cls.account_2_setting)
 
@@ -237,7 +240,7 @@ class TestMultilayerSetting:
             "whoami",
             Layers.USER,
             entity_id=self.user_1.id,
-            parent_id=self.user_1.account_id,
+            parent_ids=[self.user_1.group_id, self.user_1.account_id],
         )
         assert not result
 
@@ -299,7 +302,7 @@ class TestMultilayerSetting:
             self.account_4_setting.name,
             Layers.USER,
             entity_id=self.user_4.id,
-            parent_id=self.user_4.account_id,
+            parent_ids=[self.user_4.group_id, self.user_4.account_id],
         )
         assert result
         assert result.value == self.account_4_setting.value
@@ -309,25 +312,12 @@ class TestMultilayerSetting:
         """The account and group have value set, user not.
         Expected: get group setting.
         """
-        # using account id as parent
         result = MultilayerSetting.get_setting(
             dbsession,
             self.account_2_setting.name,
             Layers.USER,
             entity_id=self.user_2.id,
-            parent_id=self.user_2.account_id,
-        )
-        assert result
-        assert result.value == self.group_2_setting.value
-        assert result.id == self.group_2_setting.id
-
-        # using group id as parent
-        result = MultilayerSetting.get_setting(
-            dbsession,
-            self.account_2_setting.name,
-            Layers.USER,
-            entity_id=self.user_2.id,
-            parent_id=self.user_2.group_id,
+            parent_ids=[self.user_2.group_id, self.user_2.account_id],
         )
         assert result
         assert result.value == self.group_2_setting.value
@@ -342,7 +332,7 @@ class TestMultilayerSetting:
             self.system_setting.name,
             Layers.USER,
             entity_id=self.user_3.id,
-            parent_id=self.user_3.account_id,
+            parent_ids=[self.user_3.group_id, self.user_3.account_id],
         )
         assert result
         assert result.value == self.system_setting.value
@@ -356,7 +346,7 @@ class TestMultilayerSetting:
             self.user_1_setting.name,
             Layers.USER,
             entity_id=self.user_1.id,
-            parent_id=self.user_1.account_id,
+            parent_ids=[self.user_1.group_id, self.user_1.account_id],
         )
         assert result
         assert result.value == self.user_1_setting.value
