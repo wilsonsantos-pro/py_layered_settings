@@ -153,7 +153,6 @@ class TestLayeredSetting:
             value="70",
             layer_id=cls.layer_user.id,
             entity_id=cls.user_1.id,
-            parent_id=cls.user_1.account_id,
         )
         dbsession.add(cls.user_1_setting)
         dbsession.flush()
@@ -163,7 +162,6 @@ class TestLayeredSetting:
             value="g20",
             layer_id=cls.layer_group.id,
             entity_id=cls.group_2.id,
-            parent_id=cls.group_2.account_id,
         )
         dbsession.add(cls.group_2_setting)
         dbsession.flush()
@@ -173,7 +171,6 @@ class TestLayeredSetting:
             value="g40",
             layer_id=cls.layer_group.id,
             entity_id=cls.group_4.id,
-            parent_id=cls.group_4.account_id,
         )
         dbsession.add(cls.group_4_setting)
         dbsession.flush()

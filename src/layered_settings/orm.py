@@ -36,14 +36,11 @@ class LayeredSetting(Base):
     # TODO(business rule) don't allow setting creation for entity_id == None, unless
     # it's the default layer
     entity_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
-    # parent is the entity in the "upper" layer
-    parent_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
 
     def __repr__(self) -> str:
         return (
             f"id={self.id},name={self.name},value={self.value},"
-            f"layer_id={self.layer_id},entity_id={self.entity_id},"
-            f"parent_id={self.parent_id}"
+            f"layer_id={self.layer_id},entity_id={self.entity_id}"
         )
 
     @staticmethod
