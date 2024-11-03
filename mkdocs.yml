@@ -1,0 +1,5 @@
+site_name: Layered Settings
+
+plugins:
+  - search
+  - mermaid2

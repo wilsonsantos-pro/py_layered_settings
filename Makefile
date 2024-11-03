@@ -101,3 +101,26 @@ mypy:
 	poetry run mypy src/ tests/
 
 	@echo ""
+
+########
+# Docs #
+########
+.PHONY: docs
+docs:
+	@echo "--------------"
+	@echo "- 📚 Docs 📚 -"
+	@echo "--------------"
+
+	poetry run mkdocs build
+
+	@echo ""
+
+.PHONY: docs-serve
+docs-serve:
+	@echo "--------------"
+	@echo "- 📚 Docs 📚 -"
+	@echo "--------------"
+
+	poetry run mkdocs serve
+
+	@echo ""
