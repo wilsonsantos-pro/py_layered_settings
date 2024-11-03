@@ -1,81 +1,23 @@
 # pylint: disable=redefined-outer-name
-import contextlib
 from dataclasses import dataclass
 from enum import Enum
-from functools import lru_cache, partial
-from typing import TYPE_CHECKING, Any, Callable, Generator, Optional, Type
+from functools import partial
+from typing import TYPE_CHECKING, Any, Optional
 
 import pytest
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
 
-from multilayer_settings.orm import Base, Layer, MultilayerSetting
+from multilayer_settings.orm import Layer, MultilayerSetting
 from tests.random_data import random_int
 
 if TYPE_CHECKING:
-    from sqlalchemy import Engine
     from sqlalchemy.orm import Session
-
-
-@pytest.fixture(scope="class")
-def in_memory_sqlite_db():
-    engine = create_engine("sqlite:///:memory:")
-    Base.metadata.create_all(engine)
-    return engine
-
-
-@lru_cache
-def setup_db_engine():
-    engine = create_engine("sqlite:///:memory:")
-    Base.metadata.create_all(engine)
-    return engine
-
-
-@pytest.fixture(scope="class")
-def sqlite_session_factory(
-    in_memory_sqlite_db,
-) -> Generator["sessionmaker[Session]", None, None]:
-    yield sessionmaker(
-        bind=in_memory_sqlite_db, autoflush=False, expire_on_commit=False
-    )
-
-
-def create_session_factory(engine: "Engine") -> "sessionmaker[Session]":
-    return sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
-
-
-@pytest.fixture(name="dbsession", scope="class")
-def _dbsession(sqlite_session_factory) -> Generator["Session", None, None]:
-    session: "Session" = sqlite_session_factory()
-    with dbsession_ctx(sqlite_session_factory, auto_commit=False) as session:
-        try:
-            yield session
-        finally:
-            session.rollback()
-    # TODO: add fixture that assert db is empty
-
-
-SessionFactory = Callable[["Engine"], "sessionmaker[Session]"]
-
-
-@contextlib.contextmanager
-def dbsession_ctx(
-    session_factory: "sessionmaker[Session]", auto_commit: bool = True
-) -> Generator["Session", None, None]:
-    session: "Session" = session_factory()
-    try:
-        yield session
-        if auto_commit:
-            session.commit()
-    except:  # pylint: disable=bare-except
-        session.rollback()
 
 
 class Layers(int, Enum):
     SYSTEM = 1
     ACCOUNT = 2
-    USER = 3
-    GROUP = 4
+    GROUP = 3
+    USER = 4
 
 
 class Settings(str, Enum):
@@ -175,6 +117,7 @@ class TestMultilayerSetting:
             layer_id=cls.layer_system.id,
         )
         dbsession.add(cls.system_setting)
+        dbsession.flush()
 
         cls.account_1_setting = MultilayerSetting(
             name=Settings.lights,
@@ -183,6 +126,7 @@ class TestMultilayerSetting:
             entity_id=cls.account_1_id,
         )
         dbsession.add(cls.account_1_setting)
+        dbsession.flush()
 
         cls.account_2_setting = MultilayerSetting(
             name=Settings.lights,
@@ -191,6 +135,7 @@ class TestMultilayerSetting:
             entity_id=cls.account_2_id,
         )
         dbsession.add(cls.account_2_setting)
+        dbsession.flush()
 
         # no setting for account 3
 
@@ -201,6 +146,7 @@ class TestMultilayerSetting:
             entity_id=cls.account_4_id,
         )
         dbsession.add(cls.account_4_setting)
+        dbsession.flush()
 
         cls.user_1_setting = MultilayerSetting(
             name=Settings.lights,
@@ -210,6 +156,7 @@ class TestMultilayerSetting:
             parent_id=cls.user_1.account_id,
         )
         dbsession.add(cls.user_1_setting)
+        dbsession.flush()
 
         cls.group_2_setting = MultilayerSetting(
             name=Settings.lights,
@@ -219,6 +166,7 @@ class TestMultilayerSetting:
             parent_id=cls.group_2.account_id,
         )
         dbsession.add(cls.group_2_setting)
+        dbsession.flush()
 
         cls.group_4_setting = MultilayerSetting(
             name=Settings.lights,
@@ -228,7 +176,6 @@ class TestMultilayerSetting:
             parent_id=cls.group_4.account_id,
         )
         dbsession.add(cls.group_4_setting)
-
         dbsession.flush()
 
     @classmethod
