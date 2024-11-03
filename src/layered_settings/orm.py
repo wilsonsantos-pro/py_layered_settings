@@ -23,8 +23,8 @@ class Layer(Base):
     # that's the default layer
 
 
-class MultilayerSetting(Base):
-    __tablename__ = "settings__multilayer_setting"
+class LayeredSetting(Base):
+    __tablename__ = "settings__layered_setting"
 
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(50), nullable=False)
@@ -53,17 +53,17 @@ class MultilayerSetting(Base):
         layer_id: int,
         entity_id: Optional[int] = None,
         parent_ids: Optional[List[Optional[int]]] = None,
-    ) -> Optional["MultilayerSetting"]:
+    ) -> Optional["LayeredSetting"]:
         where_clause = [
-            MultilayerSetting.name == name,
-            MultilayerSetting.layer_id == layer_id,
+            LayeredSetting.name == name,
+            LayeredSetting.layer_id == layer_id,
         ]
         if entity_id:
-            where_clause.append(MultilayerSetting.entity_id == entity_id)
+            where_clause.append(LayeredSetting.entity_id == entity_id)
         else:
-            where_clause.append(MultilayerSetting.entity_id.is_(None))
+            where_clause.append(LayeredSetting.entity_id.is_(None))
 
-        stmt = select(MultilayerSetting).where(*where_clause)
+        stmt = select(LayeredSetting).where(*where_clause)
         result = dbsession.scalars(stmt).first()
 
         # "and entity_id or parent_ids" guarantees that we stop when it's the last layer
@@ -76,7 +76,7 @@ class MultilayerSetting(Base):
                     parent_id = parent_ids[0]
                     parent_ids = parent_ids[1:]
 
-                    return MultilayerSetting.get_setting(
+                    return LayeredSetting.get_setting(
                         dbsession,
                         name,
                         layer.fallback_id,
@@ -88,7 +88,7 @@ class MultilayerSetting(Base):
             layer_stmt = select(Layer).where(Layer.fallback_id.is_(None))
             default_layer = dbsession.scalars(layer_stmt).first()
             if default_layer:
-                return MultilayerSetting.get_setting(
+                return LayeredSetting.get_setting(
                     dbsession,
                     name,
                     default_layer.id,

@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Any, Optional
 
 import pytest
 
-from multilayer_settings.orm import Layer, MultilayerSetting
+from layered_settings.orm import Layer, LayeredSetting
 from tests.random_data import random_int
 
 if TYPE_CHECKING:
@@ -41,7 +41,7 @@ class UserSettingsRepository:
         return self.get(Settings.lights)
 
     def get(self, name: Settings) -> Any:
-        return MultilayerSetting.get_setting(
+        return LayeredSetting.get_setting(
             self.dbsession,
             name,
             Layers.USER,
@@ -65,7 +65,7 @@ class Group:
     account_id: int
 
 
-class TestMultilayerSetting:
+class TestLayeredSetting:
     @classmethod
     def _create_layers(cls, dbsession: "Session"):
         cls.layer_system = Layer(id=Layers.SYSTEM, name="system")
@@ -111,7 +111,7 @@ class TestMultilayerSetting:
     @classmethod
     def _create_settings(cls, dbsession: "Session"):
 
-        cls.system_setting = MultilayerSetting(
+        cls.system_setting = LayeredSetting(
             name=Settings.lights,
             value="0",
             layer_id=cls.layer_system.id,
@@ -119,7 +119,7 @@ class TestMultilayerSetting:
         dbsession.add(cls.system_setting)
         dbsession.flush()
 
-        cls.account_1_setting = MultilayerSetting(
+        cls.account_1_setting = LayeredSetting(
             name=Settings.lights,
             value="10",
             layer_id=cls.layer_account.id,
@@ -128,7 +128,7 @@ class TestMultilayerSetting:
         dbsession.add(cls.account_1_setting)
         dbsession.flush()
 
-        cls.account_2_setting = MultilayerSetting(
+        cls.account_2_setting = LayeredSetting(
             name=Settings.lights,
             value="a20",
             layer_id=cls.layer_account.id,
@@ -139,7 +139,7 @@ class TestMultilayerSetting:
 
         # no setting for account 3
 
-        cls.account_4_setting = MultilayerSetting(
+        cls.account_4_setting = LayeredSetting(
             name="exclusive4",
             value="50",
             layer_id=cls.layer_account.id,
@@ -148,7 +148,7 @@ class TestMultilayerSetting:
         dbsession.add(cls.account_4_setting)
         dbsession.flush()
 
-        cls.user_1_setting = MultilayerSetting(
+        cls.user_1_setting = LayeredSetting(
             name=Settings.lights,
             value="70",
             layer_id=cls.layer_user.id,
@@ -158,7 +158,7 @@ class TestMultilayerSetting:
         dbsession.add(cls.user_1_setting)
         dbsession.flush()
 
-        cls.group_2_setting = MultilayerSetting(
+        cls.group_2_setting = LayeredSetting(
             name=Settings.lights,
             value="g20",
             layer_id=cls.layer_group.id,
@@ -168,7 +168,7 @@ class TestMultilayerSetting:
         dbsession.add(cls.group_2_setting)
         dbsession.flush()
 
-        cls.group_4_setting = MultilayerSetting(
+        cls.group_4_setting = LayeredSetting(
             name=Settings.lights,
             value="g40",
             layer_id=cls.layer_group.id,
@@ -190,7 +190,7 @@ class TestMultilayerSetting:
     def test_setting_default(self, dbsession: "Session"):
         """Get the setting's default.
         Expected: get system setting."""
-        result = MultilayerSetting.get_setting(
+        result = LayeredSetting.get_setting(
             dbsession, self.system_setting.name, Layers.SYSTEM
         )
         assert result
@@ -200,13 +200,13 @@ class TestMultilayerSetting:
     def test_setting_default_does_not_exist(self, dbsession: "Session"):
         """The setting requested is not set, not even a default.
         Expected: None"""
-        result = MultilayerSetting.get_setting(dbsession, "whoami", Layers.SYSTEM)
+        result = LayeredSetting.get_setting(dbsession, "whoami", Layers.SYSTEM)
         assert not result
 
     def test_account_setting_does_not_exist(self, dbsession: "Session"):
         """The setting requested for account is not set, not even a default.
         Expected: None"""
-        result = MultilayerSetting.get_setting(
+        result = LayeredSetting.get_setting(
             dbsession, "whoami", Layers.ACCOUNT, entity_id=self.account_1_id
         )
         assert not result
@@ -214,7 +214,7 @@ class TestMultilayerSetting:
     def test_user_setting_does_not_exist(self, dbsession: "Session"):
         """The setting requested for user is not set, not even a default.
         Expected: None"""
-        result = MultilayerSetting.get_setting(
+        result = LayeredSetting.get_setting(
             dbsession,
             "whoami",
             Layers.USER,
@@ -226,7 +226,7 @@ class TestMultilayerSetting:
     def test_account_setting(self, dbsession: "Session"):
         """Two accounts, each account has its own setting set.
         Expected: get value for the corresponding account."""
-        result = MultilayerSetting.get_setting(
+        result = LayeredSetting.get_setting(
             dbsession,
             self.account_1_setting.name,
             Layers.ACCOUNT,
@@ -236,7 +236,7 @@ class TestMultilayerSetting:
         assert result.value == self.account_1_setting.value
         assert result.id == self.account_1_setting.id
 
-        result = MultilayerSetting.get_setting(
+        result = LayeredSetting.get_setting(
             dbsession,
             self.account_2_setting.name,
             Layers.ACCOUNT,
@@ -249,7 +249,7 @@ class TestMultilayerSetting:
     def test_account_without_value(self, dbsession: "Session"):
         """An account doesn't have the value set for the setting.
         Expected: get system setting."""
-        result = MultilayerSetting.get_setting(
+        result = LayeredSetting.get_setting(
             dbsession,
             self.system_setting.name,
             Layers.ACCOUNT,
@@ -262,7 +262,7 @@ class TestMultilayerSetting:
     def test_account_value_and_default_does_not_exist(self, dbsession: "Session"):
         """The setting is only set on this account, default does not exist.
         Expected: get account setting."""
-        result = MultilayerSetting.get_setting(
+        result = LayeredSetting.get_setting(
             dbsession,
             self.account_4_setting.name,
             Layers.ACCOUNT,
@@ -276,7 +276,7 @@ class TestMultilayerSetting:
         """The account has value set, user and group not.
         Expected: get account setting.
         """
-        result = MultilayerSetting.get_setting(
+        result = LayeredSetting.get_setting(
             dbsession,
             self.account_4_setting.name,
             Layers.USER,
@@ -291,7 +291,7 @@ class TestMultilayerSetting:
         """The account and group have value set, user not.
         Expected: get group setting.
         """
-        result = MultilayerSetting.get_setting(
+        result = LayeredSetting.get_setting(
             dbsession,
             self.account_2_setting.name,
             Layers.USER,
@@ -306,7 +306,7 @@ class TestMultilayerSetting:
         """User, Group and Account don't have an explicit setting value set.
         Expected: get system setting.
         """
-        result = MultilayerSetting.get_setting(
+        result = LayeredSetting.get_setting(
             dbsession,
             self.system_setting.name,
             Layers.USER,
@@ -320,7 +320,7 @@ class TestMultilayerSetting:
     def test_user_setting(self, dbsession: "Session"):
         """User has the setting explicitly set.
         Expected: get user setting."""
-        result = MultilayerSetting.get_setting(
+        result = LayeredSetting.get_setting(
             dbsession,
             self.user_1_setting.name,
             Layers.USER,

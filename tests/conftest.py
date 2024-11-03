@@ -5,8 +5,8 @@ import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from multilayer_settings.db import create_session_factory, dbsession_ctx
-from multilayer_settings.orm import Base
+from layered_settings.db import create_session_factory, dbsession_ctx
+from layered_settings.orm import Base
 
 if TYPE_CHECKING:
     from sqlalchemy import Engine
